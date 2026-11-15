@@ -1,0 +1,8 @@
+{
+  "name": "Codevity – Developer Productivity Analyser",
+  "description": "Analyse GitHub repository commit consistency, contributor collaboration, pull request workflows, and AI-assisted development insights.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,187 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['userId', 'name', 'email', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'name', 'email', 'createdAt', 'updatedAt']) &&
+        data.userId is string &&
+        data.userId == request.auth.uid &&
+        data.userId == userId &&
+        data.name is string &&
+        data.name.size() >= 1 &&
+        data.name.size() <= 100 &&
+        data.email is string &&
+        data.email.size() >= 3 &&
+        data.email.size() <= 254 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGitHubConnection(data, userId) {
+      return data.keys().hasAll(['userId', 'githubUsername', 'avatarUrl', 'tokenRef', 'connectionStatus', 'scopes', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'githubUsername', 'avatarUrl', 'tokenRef', 'connectionStatus', 'scopes', 'connectedAt', 'updatedAt']) &&
+        data.userId is string &&
+        data.userId == request.auth.uid &&
+        data.userId == userId &&
+        data.githubUsername is string &&
+        data.githubUsername.size() <= 100 &&
+        data.avatarUrl is string &&
+        data.avatarUrl.size() <= 500 &&
+        data.tokenRef is string &&
+        data.tokenRef.size() <= 128 &&
+        data.connectionStatus in ['connected', 'disconnected'] &&
+        data.scopes is string &&
+        data.scopes.size() <= 200 &&
+        (!('connectedAt' in data) || data.connectedAt is timestamp) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidScore(val) {
+      return (val is int || val is float) && val >= 0 && val <= 100;
+    }
+
+    function isValidMetricScores(m) {
+      return m is map &&
+        m.keys().hasAll(['commitFrequency', 'codeQualityEstimate', 'collaboration', 'reviewParticipation', 'documentation']) &&
+        m.keys().hasOnly(['commitFrequency', 'codeQualityEstimate', 'collaboration', 'reviewParticipation', 'documentation']) &&
+        isValidScore(m.commitFrequency) &&
+        isValidScore(m.codeQualityEstimate) &&
+        isValidScore(m.collaboration) &&
+        isValidScore(m.reviewParticipation) &&
+        isValidScore(m.documentation);
+    }
+
+    function isValidAnalysisReport(data) {
+      return data.keys().hasAll([
+          'userId',
+          'repositoryName',
+          'repositoryOwner',
+          'repositoryUrl',
+          'isPrivate',
+          'analysisPeriodDays',
+          'analysisDate',
+          'productivityScore',
+          'consistencyScore',
+          'metricScores',
+          'analyticsSummary',
+          'aiInsights',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId',
+          'repositoryName',
+          'repositoryOwner',
+          'repositoryUrl',
+          'isPrivate',
+          'analysisPeriodDays',
+          'analysisDate',
+          'productivityScore',
+          'consistencyScore',
+          'metricScores',
+          'analyticsSummary',
+          'aiInsights',
+          'createdAt'
+        ]) &&
+        data.userId is string &&
+        data.userId == request.auth.uid &&
+        data.repositoryName is string &&
+        data.repositoryName.size() >= 1 &&
+        data.repositoryName.size() <= 200 &&
+        data.repositoryOwner is string &&
+        data.repositoryOwner.size() >= 1 &&
+        data.repositoryOwner.size() <= 100 &&
+        data.repositoryUrl is string &&
+        data.repositoryUrl.size() >= 1 &&
+        data.repositoryUrl.size() <= 500 &&
+        data.isPrivate is bool &&
+        (data.analysisPeriodDays is int || data.analysisPeriodDays is float) &&
+        data.analysisPeriodDays >= 7 &&
+        data.analysisPeriodDays <= 365 &&
+        data.analysisDate is timestamp &&
+        isValidScore(data.productivityScore) &&
+        isValidScore(data.consistencyScore) &&
+        isValidMetricScores(data.metricScores) &&
+        data.analyticsSummary is map &&
+        data.analyticsSummary.size() <= 30 &&
+        data.aiInsights is map &&
+        data.aiInsights.size() <= 15 &&
+        data.createdAt is timestamp;
+    }
+
+    // Users collection: PII isolated to owner only
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidUser(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidUser(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'email', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // GitHubConnections collection: strictly per-user, no raw OAuth tokens
+    match /githubConnections/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidGitHubConnection(incoming(), userId) &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        isValidGitHubConnection(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['githubUsername', 'avatarUrl', 'tokenRef', 'connectionStatus', 'scopes', 'connectedAt', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // AnalysisReports collection: strictly scoped to owning user
+    match /analysisReports/{reportId} {
+      allow get: if isSignedIn() && isValidId(reportId) && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        isValidId(reportId) &&
+        isValidAnalysisReport(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().analysisDate == request.time;
+      allow update: if false;
+      allow delete: if isSignedIn() && isValidId(reportId) && existing().userId == request.auth.uid;
+    }
+  }
+}

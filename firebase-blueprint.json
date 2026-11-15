@@ -1,0 +1,169 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered Codevity user profile stored privately per authenticated UID.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 254
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "name", "email", "createdAt", "updatedAt"]
+    },
+    "GitHubConnection": {
+      "title": "GitHubConnection",
+      "description": "User's GitHub connection status and server-managed opaque token reference (no raw access tokens).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "githubUsername": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 100
+        },
+        "avatarUrl": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "tokenRef": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 128
+        },
+        "connectionStatus": {
+          "type": "string",
+          "enum": ["connected", "disconnected"]
+        },
+        "scopes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "connectedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "githubUsername", "tokenRef", "connectionStatus", "updatedAt"]
+    },
+    "AnalysisReport": {
+      "title": "AnalysisReport",
+      "description": "Completed GitHub repository productivity analysis report owned by a single user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "repositoryName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "repositoryOwner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "repositoryUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "isPrivate": {
+          "type": "boolean"
+        },
+        "analysisPeriodDays": {
+          "type": "number"
+        },
+        "analysisDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "productivityScore": {
+          "type": "number"
+        },
+        "consistencyScore": {
+          "type": "number"
+        },
+        "metricScores": {
+          "type": "object"
+        },
+        "analyticsSummary": {
+          "type": "object"
+        },
+        "aiInsights": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "repositoryName",
+        "repositoryOwner",
+        "repositoryUrl",
+        "isPrivate",
+        "analysisPeriodDays",
+        "analysisDate",
+        "productivityScore",
+        "consistencyScore",
+        "metricScores",
+        "analyticsSummary",
+        "aiInsights",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Private user profile documents restricted strictly to the owning user."
+    },
+    "/githubConnections/{userId}": {
+      "schema": { "$ref": "#/entities/GitHubConnection" },
+      "description": "Per-user GitHub OAuth connection status and opaque server token reference."
+    },
+    "/analysisReports/{reportId}": {
+      "schema": { "$ref": "#/entities/AnalysisReport" },
+      "description": "Saved repository analysis reports scoped strictly to the creating user."
+    }
+  }
+}
